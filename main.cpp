@@ -4,9 +4,12 @@
 #include <format>
 #include <iostream>
 #include <iterator>
+#include <ostream>
 #include <ranges>
 #include <string>
 #include <vector>
+
+constexpr char newl = '\n';
 
 struct Filter
 {
@@ -18,9 +21,9 @@ struct Filter
         return {.stops = lhs.stops + rhs.stops, .name = lhs.name + " " + rhs.name};
     }
 
-    [[nodiscard]] std::string toString() const
+    friend std::ostream &operator<<(std::ostream &out, Filter const &f)
     {
-        return std::format("{: >7}", name);
+        return out << std::format("{: >7}", f.name);
     }
 };
 
@@ -38,16 +41,26 @@ struct Shutter
         time = initSeconds + initHundredsMiliseconds / 10.0;
     }
 
-    [[nodiscard]] std::string toStringWithFilterStops(const int stops) const
+    struct WithStops
     {
-        // Increase the shutter time first by x amount of stops and then print it
-        const double increasedShutterTime = time * (1 << stops);
-        return doubleToString(increasedShutterTime);
+        const int stops;
+        Shutter const &ref;
+    };
+
+    WithStops withStops(const int stops) const
+    {
+        return WithStops{stops, *this};
     }
 
-    [[nodiscard]] std::string toString() const
+    friend std::ostream &operator<<(std::ostream &out, WithStops const &s)
     {
-        return doubleToString(time);
+        const double increasedShutterTime = s.ref.time * (1 << s.stops);
+        return out << doubleToString(increasedShutterTime);
+    }
+
+    friend std::ostream &operator<<(std::ostream &out, Shutter const &s)
+    {
+        return out << doubleToString(s.time);
     }
 
   private:
@@ -94,7 +107,7 @@ struct Shutter
 };
 
 // My personal selection of ND filters
-std::array<Filter, 4> filters = {{
+constexpr std::array<Filter, 4> filters = {{
     {10, "1k"}, // ND1000 = 10 stops
     {6, "64"},  // ND64 = 6 stops
     {3, "8"},   // ND8 = 3 stops
@@ -178,13 +191,7 @@ std::vector<Filter> combined = []() {
     std::copy(filters.begin(), filters.end(), std::back_inserter(c));
 
     // Two filter stack used
-    for (int i = 0; i < (4 - 1); i++)
-    {
-        for (int j = i + 1; j < 4; j++)
-        {
-            c.emplace_back(filters[i] + filters[j]);
-        }
-    }
+
     for (auto iter = filters.begin(), end = filters.end() - 1; iter < end; ++iter)
         for (auto sec_iter = iter + 1, sec_end = filters.end(); sec_iter < sec_end; ++sec_iter)
             c.push_back(*iter + *sec_iter);
@@ -193,67 +200,66 @@ std::vector<Filter> combined = []() {
     return c;
 }();
 
-void displayMarkdownTableHeader()
+void displayMarkdownTableHeader(std::ostream &out)
 {
-    std::cout << "| no ND   | ";
+    out << "| no ND   | ";
     for (const auto &filter : combined)
     {
-        std::cout << filter.toString() << " | ";
+        out << filter << " | ";
     }
-    std::cout << std::endl;
+    out << newl;
 
-    std::cout << "| ------- | ";
-    for (int i = 0; i < combined.size(); i++)
+    out << "| ------- | ";
+    for (const auto &_ : combined)
     {
-        std::cout << "------- | ";
+        out << "------- | ";
     }
-    std::cout << std::endl;
+    out << newl;
 }
 
-void displayMarkdownTable()
+void displayMarkdownTable(std::ostream &out)
 {
-    displayMarkdownTableHeader();
+    displayMarkdownTableHeader(out);
 
     for (const auto &shutter : shutters)
     {
-        std::cout << "| " << shutter.toString() << " | ";
+        out << "| " << shutter << " | ";
 
         // For each shutter speed show all filter combinations
         for (const auto &[stops, _] : combined)
         {
-            std::cout << shutter.toStringWithFilterStops(stops) << " | ";
+            out << shutter.withStops(stops) << " | ";
         }
 
-        std::cout << std::endl;
+        out << newl;
     }
 }
 
-void displayCsvHeader()
+void displayCsvHeader(std::ostream &out)
 {
-    std::cout << std::endl;
-
-    std::cout << "  no ND";
+    out << newl;
+    out << "  no ND";
     for (const auto &filter : combined)
     {
-        std::cout << ",  " << filter.toString();
+        out << ",  " << filter;
     }
-    std::cout << std::endl;
+    out << newl;
 }
 
-void displayCsvRow(const Shutter shutter)
+void displayCsvRow(const Shutter &shutter, std::ostream &out)
 {
-    std::cout << shutter.toString();
+    out << shutter;
 
     // For a specific shutter speed, show all filter combinations
     for (const auto &[stops, _] : combined)
     {
-        std::cout << ",  " << shutter.toStringWithFilterStops(stops);
+        out << ",  " << shutter.withStops(stops);
     }
 
-    std::cout << std::endl;
+    out << newl;
 }
 
-void displayCsvTable()
+void displayCsvTable(std::ostream &out)
 {
     const int shuttersCount = static_cast<int>(shutters.size());
     const int middle = shuttersCount / 2;
@@ -263,21 +269,17 @@ void displayCsvTable()
         if ((i % middle) == 0)
         {
             // this will trigger header twice, in begining and in middle of the table
-            displayCsvHeader();
+            displayCsvHeader(out);
         }
 
-        displayCsvRow(shutters[i]);
+        displayCsvRow(shutters[i], out);
     }
 }
 
 int main()
 {
-    // populateFiltersWithGeneratedCombinations();
-    // populateFiltersWithHandPickedCombinations();
-    // sortFilters();
-
-    displayMarkdownTable();
-    displayCsvTable();
+    displayMarkdownTable(std::cout);
+    displayCsvTable(std::cout);
 
     return 0;
 }
