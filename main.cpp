@@ -86,10 +86,10 @@ private:
 
 // My personal selection of ND filters
 std::array<Filter ,4> filters = {{
-    {10, "1k"}, // ND1000
-    {6, "64"},  // ND64
-    {3, "8"},   // ND8
-    {2, "4"},   // ND4
+    {10, "1k"},  // ND1000 = 10 stops
+    {6,  "64"},  // ND64 = 6 stops
+    {3,  "8"},   // ND8 = 3 stops
+    {2,  "4"},   // ND4 = 2 stops
 }};
 
 std::vector<Filter> combined;
@@ -162,10 +162,6 @@ void populateFiltersWithHandPickedCombinations() {
 
     // ND1k ND8 ND4
     combined.push_back(filters[0] + filters[2]  + filters[3]);
-    combined.push_back( {
-        .stops = filters[0].stops + filters[2].stops + filters[3].stops,
-        .name = filters[0].name + " " + filters[2].name + " " + filters[3].name
-    } );
 }
 
 void populateFiltersWithGeneratedCombinations() {
@@ -185,26 +181,20 @@ void populateFiltersWithGeneratedCombinations() {
     // for (int i=0; i<(4-2); i++) {
     //     for (int j=i+1; j<(4-1); j++) {
     //         for (int k=j+1; k<4; k++) {
-    //             combined.push_back( {
-    //                 .stops = filters[i].stops + filters[j].stops + filters[k].stops,
-    //                 .name = filters[i].name + " " + filters[j].name + " " + filters[k].name
-    //             } );
+    //             combined.push_back(filters[i] + filters[j]  + filters[k]);
     //         }
     //     }
     // }
-    //
+
     // // Four filters used
-    // combined.push_back( {
-    //     .stops = filters[0].stops + filters[1].stops + filters[2].stops + filters[3].stops,
-    //     .name = filters[0].name + " " + filters[1].name + " " + filters[2].name  + " " + filters[3].name
-    // } );
+    // combined.push_back(filters[0] + filters[1]  + filters[2] + filters[3]);
 }
 
 void sortFilters() {
     std::sort(combined.begin(), combined.end());
 }
 
-void displayMarkdownTable() {
+void displayMarkdownTableHeader() {
     std::cout << "| no ND   | ";
     for (const auto &filter: combined) {
         std::cout << filter.toString() << " | ";
@@ -216,10 +206,15 @@ void displayMarkdownTable() {
         std::cout << "------- | ";
     }
     std::cout << std::endl;
+}
+
+void displayMarkdownTable() {
+    displayMarkdownTableHeader();
 
     for (const auto &shutter: shutters) {
         std::cout << "| " << shutter.toString() << " | ";
 
+        // For each shutter speed show all filter combinations
         for (const auto &[stops, _]: combined) {
             std::cout << shutter.toStringWithFilterStops(stops) << " | ";
         }
@@ -241,6 +236,7 @@ void displayCsvHeader() {
 void displayCsvRow(const Shutter shutter) {
     std::cout << shutter.toString();
 
+    // For a specific shutter speed, show all filter combinations
     for (const auto &[stops, _]: combined) {
         std::cout << ",  " << shutter.toStringWithFilterStops(stops);
     }
@@ -257,6 +253,7 @@ void displayCsvTable() {
             // this will trigger header twice, in begining and in middle of the table
             displayCsvHeader();
         }
+
         displayCsvRow(shutters[i]);
     }
 }
